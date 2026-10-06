@@ -91,7 +91,7 @@ compose.desktop {
     application {
         mainClass = "com.marek.pulsorb.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.AppImage, TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi)
+            targetFormats(TargetFormat.AppImage, TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Pulsorb"
             packageVersion = "1.1.1"
             description = "Drum machine of glowing circles"
@@ -100,6 +100,26 @@ compose.desktop {
             modules("java.instrument", "jdk.unsupported")
             linux {
                 iconFile.set(rootProject.file("docs/icon/pulsorb-512.png"))
+            }
+            windows {
+                iconFile.set(rootProject.file("docs/icon/pulsorb.ico"))
+                menuGroup = "Pulsorb"
+                shortcut = true
+                dirChooser = true
+                // Fixed forever: lets a newer installer replace the old version instead of installing beside it.
+                upgradeUuid = "cd5834c8-3068-4939-84f2-32ebb94c4a0e"
+            }
+            macOS {
+                iconFile.set(rootProject.file("docs/icon/pulsorb.icns"))
+                bundleID = "com.marek.pulsorb"
+                appCategory = "public.app-category.music"
+                infoPlist {
+                    // Without this macOS silently denies the microphone (Sample circles).
+                    extraKeysRawXml = """
+                        <key>NSMicrophoneUsageDescription</key>
+                        <string>Pulsorb records short sounds from the microphone for Sample circles. Nothing is saved or sent anywhere.</string>
+                    """.trimIndent()
+                }
             }
         }
     }

@@ -1,0 +1,109 @@
+# Builds the Windows and macOS desktop packages on GitHub's machines (jpackage can only build
+# installers for the system it runs on). Linux AppImage and Android APK are built locally,
+# because the APK signing key must never leave the developer's computer.
+#
+# - Pushing a tag like v1.2.0 builds both and attaches them to that release.
+# - "Run workflow" by hand: leave the tag empty for a dry run (files appear as run artifacts),
+#   or enter an existing release tag to attach the files to it.
+name: Desktop builds (Windows, macOS)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Attach the builds to this existing release (e.g. v1.1.1). Leave empty for a dry run.
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install WiX Toolset 3.14 (needed by jpackage for .msi and .exe)
+        shell: pwsh
+        run: |
+          choco install wixtoolset --version 3.14.1 -y --no-progress
+          "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Build installer, setup program and portable app
+        run: ./gradlew :composeApp:packageMsi :composeApp:packageExe :composeApp:createDistributable --console=plain
+
+      - name: Collect files
+        run: |
+          V=$(sed -n 's/.*packageVersion = "\(.*\)".*/\1/p' composeApp/build.gradle.kts)
+          OUT="$PWD/out"
+          mkdir -p "$OUT"
+          B=composeApp/build/compose/binaries/main
+          cp $B/msi/*.msi "$OUT/Pulsorb-$V-windows-x64.msi"
+          cp $B/exe/*.exe "$OUT/Pulsorb-$V-windows-x64-setup.exe"
+          (cd $B/app && 7z a -tzip "$OUT/Pulsorb-$V-windows-x64-portable.zip" Pulsorb > /dev/null)
+          (cd "$OUT" && sha256sum Pulsorb-* > SHA256SUMS-windows.txt && cat SHA256SUMS-windows.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*
+
+      - name: Attach to release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # On a tag push the release may not exist yet (it's created locally with the APK and AppImage).
+          for i in $(seq 1 40); do gh release view "$RELEASE_TAG" > /dev/null 2>&1 && break; echo "Waiting for release $RELEASE_TAG..."; sleep 30; done
+          gh release view "$RELEASE_TAG" > /dev/null 2>&1 || gh release create "$RELEASE_TAG" --title "Pulsorb ${RELEASE_TAG#v}" --notes "Desktop builds." || true
+          gh release upload "$RELEASE_TAG" out/* --clobber
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build disk image
+        run: ./gradlew :composeApp:packageDmg --console=plain
+
+      - name: Collect files
+        run: |
+          V=$(sed -n 's/.*packageVersion = "\(.*\)".*/\1/p' composeApp/build.gradle.kts)
+          ARCH=$(uname -m | sed 's/x86_64/x64/')
+          mkdir -p out
+          cp composeApp/build/compose/binaries/main/dmg/*.dmg "out/Pulsorb-$V-macos-$ARCH.dmg"
+          (cd out && shasum -a 256 Pulsorb-* > SHA256SUMS-macos.txt && cat SHA256SUMS-macos.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/*
+
+      - name: Attach to release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # On a tag push the release may not exist yet (it's created locally with the APK and AppImage).
+          for i in $(seq 1 40); do gh release view "$RELEASE_TAG" > /dev/null 2>&1 && break; echo "Waiting for release $RELEASE_TAG..."; sleep 30; done
+          gh release view "$RELEASE_TAG" > /dev/null 2>&1 || gh release create "$RELEASE_TAG" --title "Pulsorb ${RELEASE_TAG#v}" --notes "Desktop builds." || true
+          gh release upload "$RELEASE_TAG" out/* --clobber
