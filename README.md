@@ -21,8 +21,16 @@ Get the latest version from the [Releases](https://github.com/MarekDudka/Pulsorb
   ./Pulsorb-*-x86_64.AppImage
   ```
   It includes its own Java runtime, so nothing else needs to be installed.
+- **Windows** (64-bit): download `Pulsorb-<version>-windows-x64.msi` (installer) or
+  `…-windows-x64-setup.exe`, or `…-windows-x64-portable.zip` to run `Pulsorb.exe` without installing.
+  The app isn't code-signed, so Windows may show "Windows protected your PC": click **More info →
+  Run anyway**.
+- **macOS** (Apple silicon): download `Pulsorb-<version>-macos-arm64.dmg` and drag Pulsorb to
+  Applications. The app isn't notarized by Apple, so the first time **right-click it → Open**
+  (or allow it under System Settings → Privacy & Security).
 
-`SHA256SUMS` lets you check the downloads with `sha256sum -c SHA256SUMS`.
+All desktop versions include their own Java runtime. `SHA256SUMS*` files let you check the
+downloads with `sha256sum -c`.
 
 ## Features
 
@@ -161,6 +169,12 @@ You can also open the project in Android Studio or IntelliJ IDEA.
 # Linux AppImage -> dist/Pulsorb-<version>-x86_64.AppImage (needs mksquashfs)
 ./scripts/build-appimage.sh
 ```
+
+Windows (`.msi`, setup `.exe`, portable `.zip`) and macOS (`.dmg`) packages can only be built on
+those systems, so [GitHub Actions](.github/workflows/desktop-builds.yml) builds them: pushing a
+version tag like `v1.2.0` builds both and attaches them to that release. You can also start the
+workflow by hand under **Actions → Desktop builds → Run workflow**: leave the tag empty for a dry
+run, or enter an existing release tag to attach the files to it.
 
 The release APK is signed with the key named in `keystore.properties` in the project root, which is
 git-ignored and holds `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without that file
