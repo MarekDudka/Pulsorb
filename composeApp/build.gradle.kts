@@ -91,7 +91,13 @@ compose.desktop {
     application {
         mainClass = "com.marek.pulsorb.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.AppImage, TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe)
+            // jpackage only builds packages for the system it runs on, and Compose rejects the others.
+            val os = System.getProperty("os.name")
+            when {
+                os.startsWith("Mac") -> targetFormats(TargetFormat.Dmg)
+                os.startsWith("Windows") -> targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+                else -> targetFormats(TargetFormat.AppImage, TargetFormat.Deb)
+            }
             packageName = "Pulsorb"
             packageVersion = "1.1.1"
             description = "Drum machine of glowing circles"

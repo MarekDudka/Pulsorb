@@ -37,11 +37,15 @@ jobs:
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Install WiX Toolset 3.14 (needed by jpackage for .msi and .exe)
+      - name: Put WiX Toolset 3 on the PATH (needed by jpackage for .msi and .exe)
         shell: pwsh
         run: |
-          choco install wixtoolset --version 3.14.1 -y --no-progress
-          "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          # GitHub's Windows image already has WiX 3; install it only if that ever changes.
+          $find = { Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset v3*" | Sort-Object Name -Descending | Select-Object -First 1 }
+          $wix = & $find
+          if (-not $wix) { choco install wixtoolset -y --no-progress; $wix = & $find }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          & "$($wix.FullName)\bin\candle.exe" -? | Select-Object -First 1
 
       - name: Build installer, setup program and portable app
         run: ./gradlew :composeApp:packageMsi :composeApp:packageExe :composeApp:createDistributable --console=plain
