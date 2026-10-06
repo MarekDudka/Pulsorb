@@ -25,9 +25,15 @@ Get the latest version from the [Releases](https://github.com/MarekDudka/Pulsorb
   `…-windows-x64-setup.exe`, or `…-windows-x64-portable.zip` to run `Pulsorb.exe` without installing.
   The app isn't code-signed, so Windows may show "Windows protected your PC": click **More info →
   Run anyway**.
-- **macOS** (Apple silicon): download `Pulsorb-<version>-macos-arm64.dmg` and drag Pulsorb to
-  Applications. The app isn't notarized by Apple, so the first time **right-click it → Open**
-  (or allow it under System Settings → Privacy & Security).
+- **macOS** 11 or newer: download `Pulsorb-<version>-macos-arm64.dmg` for Apple silicon (M1 and
+  newer) or `…-macos-x64.dmg` for Intel Macs (Apple menu → About This Mac shows which you have),
+  then drag Pulsorb to Applications. The app isn't notarized by Apple, so the first launch is
+  blocked once:
+  1. Open Pulsorb. macOS says it can't verify the app; click **Done**.
+  2. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to
+     the Pulsorb message, then confirm with your password.
+
+  After that it opens normally. (On macOS 14 and older you can instead right-click Pulsorb → **Open**.)
 
 All desktop versions include their own Java runtime. `SHA256SUMS*` files let you check the
 downloads with `sha256sum -c`.
@@ -171,7 +177,8 @@ You can also open the project in Android Studio or IntelliJ IDEA.
 ```
 
 Windows (`.msi`, setup `.exe`, portable `.zip`) and macOS (`.dmg`) packages can only be built on
-those systems, so [GitHub Actions](.github/workflows/desktop-builds.yml) builds them: pushing a
+those systems, so [GitHub Actions](.github/workflows/desktop-builds.yml) builds them on GitHub's
+free Windows, Apple-silicon and Intel Mac machines: pushing a
 version tag like `v1.2.0` builds both and attaches them to that release. You can also start the
 workflow by hand under **Actions → Desktop builds → Run workflow**: leave the tag empty for a dry
 run, or enter an existing release tag to attach the files to it.

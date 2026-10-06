@@ -119,6 +119,8 @@ compose.desktop {
                 iconFile.set(rootProject.file("docs/icon/pulsorb.icns"))
                 bundleID = "com.marek.pulsorb"
                 appCategory = "public.app-category.music"
+                // The bundled Java 21 runtime needs macOS 11 (Big Sur) or newer.
+                minimumSystemVersion = "11.0"
                 infoPlist {
                     // Without this macOS silently denies the microphone (Sample circles).
                     extraKeysRawXml = """
