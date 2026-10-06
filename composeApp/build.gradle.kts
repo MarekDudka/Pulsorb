@@ -60,8 +60,8 @@ android {
         applicationId = "com.marek.pulsorb"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -99,7 +99,7 @@ compose.desktop {
                 else -> targetFormats(TargetFormat.AppImage, TargetFormat.Deb)
             }
             packageName = "Pulsorb"
-            packageVersion = "1.1.1"
+            packageVersion = "1.2.0"
             description = "Drum machine of glowing circles"
             vendor = "Marek Dudka"
             licenseFile.set(rootProject.file("LICENSE"))
