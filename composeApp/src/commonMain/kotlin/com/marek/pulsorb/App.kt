@@ -39,8 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -52,11 +54,11 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.random.Random
 import kotlin.reflect.KProperty
 
-private const val MIN_BPM = 40.0
-private const val MAX_BPM = 240.0
+internal const val MIN_BPM = 40.0
+internal const val MAX_BPM = 240.0
 /** Four full turns sweep the whole 60 Hz – 18 kHz range (logarithmic, ~2 octaves per turn). */
 private const val MAX_ANGLE = 1440f
-private const val MAX_CIRCLES = 12
+internal const val MAX_CIRCLES = 12
 private val MARGIN = 32.dp
 private val RADIUS = 40.dp
 private val PALETTE = listOf(
@@ -67,33 +69,10 @@ private val PALETTE = listOf(
 /** Circle height that gives [bpm]. */
 internal fun yForBpm(bpm: Double): Float = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)).toFloat()
 
-/** One circle of the start-up scene. */
-internal class ScenePart(
-    val sound: DrumSound,
-    val bpm: Double,
-    val frequency: Double,
-    val volume: Float,
-    val offsetBeats: Double = 0.0,
-    val reverb: Float = 0.15f,
-    val echo: Float = 0f,
-)
+internal fun bpmForY(y: Float): Double = MIN_BPM + y * (MAX_BPM - MIN_BPM)
 
-internal const val SCENE_BPM = 120.0
-
-/**
- * Start-up scene: a 120 BPM groove (kick on every beat, snare on 2 and 4, off-beat hi-hat) plus four bells on A-minor pentatonic notes (always consonant).
- * The bells loop every 2, 1.5, 1.25 and 0.75 beats, so the melody keeps evolving and only repeats
- * after 30 beats – like a music box.
- */
-internal val DEFAULT_SCENE = listOf(
-    ScenePart(DrumSound.KICK, bpm = 120.0, frequency = 60.0, volume = 0.40f),
-    ScenePart(DrumSound.SNARE, bpm = 60.0, frequency = 190.0, volume = 0.22f, offsetBeats = 1.0, reverb = 0.25f), // beats 2 and 4
-    ScenePart(DrumSound.HIHAT, bpm = 120.0, frequency = 420.0, volume = 0.14f, offsetBeats = 0.5),                // off-beat "and"s
-    ScenePart(DrumSound.BELL, bpm = 60.0, frequency = 440.00, volume = 0.45f, reverb = 0.35f),                  // A4
-    ScenePart(DrumSound.BELL, bpm = 80.0, frequency = 523.25, volume = 0.32f, reverb = 0.35f),                  // C5
-    ScenePart(DrumSound.BELL, bpm = 96.0, frequency = 659.25, volume = 0.58f, reverb = 0.35f, echo = 0.25f),    // E5
-    ScenePart(DrumSound.BELL, bpm = 160.0, frequency = 783.99, volume = 0.18f, reverb = 0.45f),                 // G5
-)
+internal fun frequencyForAngle(angle: Float): Double =
+    MIN_FREQUENCY * (MAX_FREQUENCY / MIN_FREQUENCY).pow((angle / MAX_ANGLE).toDouble())
 
 internal fun angleFor(frequency: Double): Float =
     (MAX_ANGLE * ln(frequency / MIN_FREQUENCY) / ln(MAX_FREQUENCY / MIN_FREQUENCY)).toFloat()
@@ -103,13 +82,23 @@ internal fun angleFor(frequency: Double): Float =
  * Every sound-related change is pushed to the [voice] immediately, so the audio thread hears it
  * right away – even for a muted circle that produces no beats.
  */
-class CircleState(val id: Int, val voice: Voice, val color: Color, x: Float, y: Float) {
+class CircleState(
+    val id: Int,
+    val voice: Voice,
+    val color: Color,
+    x: Float,
+    y: Float,
+    angle: Float = angleFor(voice.sound.defaultFrequency),
+    muted: Boolean = false,
+    echo: Float = 0f,
+    reverb: Float = 0.15f,
+) {
     var x by synced(x)
     var y by synced(y)
-    var angle by synced(angleFor(voice.sound.defaultFrequency))  // degrees, clockwise positive
-    var muted by synced(false)
-    var echo by synced(0f)                    // 0..1
-    var reverb by synced(0.15f)               // 0..1
+    var angle by synced(angle)                // degrees, clockwise positive
+    var muted by synced(muted)
+    var echo by synced(echo)                  // 0..1
+    var reverb by synced(reverb)              // 0..1
     var recording by mutableStateOf(false)
     var hasSample by mutableStateOf(false)
     var recorder: SampleRecorder? = null
@@ -117,10 +106,9 @@ class CircleState(val id: Int, val voice: Voice, val color: Color, x: Float, y: 
     val isSample get() = voice.sound == DrumSound.SAMPLE
 
     val label get() = "${voice.sound.label} $id"
-    val bpm get() = MIN_BPM + y * (MAX_BPM - MIN_BPM)                   // up    -> faster
+    val bpm get() = bpmForY(y)                                           // up    -> faster
     val volume get() = x.toDouble()                                      // right -> louder
-    val frequency get() =                                                // turn  -> higher pitch
-        MIN_FREQUENCY * (MAX_FREQUENCY / MIN_FREQUENCY).pow((angle / MAX_ANGLE).toDouble())
+    val frequency get() = frequencyForAngle(angle)                       // turn  -> higher pitch
 
     fun moveBy(dx: Float, dy: Float) {
         x = (x + dx).coerceIn(0f, 1f)
@@ -211,18 +199,53 @@ fun App() {
             c.recorder?.requestStop()
         }
 
-        fun addCircle(
-            sound: DrumSound,
-            x: Float = Random.nextFloat() * 0.6f + 0.2f,
-            y: Float = Random.nextFloat() * 0.6f + 0.2f,
-        ): CircleState? {
-            if (circles.size >= MAX_CIRCLES) return null
+        /** Adds a circle at a random spot; a new Sample circle starts recording right away. */
+        fun addCircle(sound: DrumSound) {
+            if (circles.size >= MAX_CIRCLES) return
             val id = nextId++
-            val circle = CircleState(id, engine.addVoice(sound), PALETTE[(id - 1) % PALETTE.size], x, y)
+            val x = Random.nextFloat() * 0.6f + 0.2f
+            val y = Random.nextFloat() * 0.6f + 0.2f
+            val voice = engine.addVoice(sound) { bpm = bpmForY(y); volume = x.toDouble() }
+            val circle = CircleState(id, voice, PALETTE[(id - 1) % PALETTE.size], x, y)
             circles += circle
             if (sound == DrumSound.SAMPLE) startRecording(circle)
-            return circle
         }
+
+        /** Replaces all circles with the preset's. Sample circles come back empty (audio is never saved). */
+        fun loadPreset(preset: Preset) {
+            circles.toList().forEach { c ->
+                stopRecording(c)
+                circles.remove(c)
+                engine.removeVoice(c.voice)
+            }
+            nextId = 1
+            for (p in preset.sanitized().circles) {
+                val sound = DrumSound.valueOf(p.sound)
+                val id = nextId++
+                val y = yForBpm(p.bpm)
+                // Configure the voice fully before the audio thread sees it, so the groove starts in time.
+                val voice = engine.addVoice(sound) {
+                    bpm = p.bpm; volume = p.volume.toDouble(); frequency = p.frequency
+                    muted = p.muted; echo = p.echo.toDouble(); reverb = p.reverb.toDouble()
+                    delayStart(p.startDelay)
+                }
+                circles += CircleState(
+                    id, voice, PALETTE[(id - 1) % PALETTE.size], p.volume, y,
+                    angle = angleFor(p.frequency), muted = p.muted, echo = p.echo, reverb = p.reverb,
+                )
+            }
+        }
+
+        /** The current circles as a preset, including their timing relative to each other. */
+        fun currentPreset(name: String) = Preset(
+            name = name,
+            circles = circles.map { c ->
+                PresetCircle(
+                    sound = c.voice.sound.name, bpm = c.bpm, volume = c.x, frequency = c.frequency,
+                    echo = c.echo, reverb = c.reverb, muted = c.muted, startDelay = c.voice.secondsUntilNextHit,
+                )
+            },
+        )
 
         fun removeCircle(c: CircleState) {
             stopRecording(c)
@@ -230,16 +253,15 @@ fun App() {
             engine.removeVoice(c.voice)
         }
 
-        LaunchedEffect(Unit) {
-            for (p in DEFAULT_SCENE) {
-                addCircle(p.sound, p.volume, yForBpm(p.bpm))?.apply {
-                    angle = angleFor(p.frequency)
-                    reverb = p.reverb
-                    echo = p.echo
-                    voice.delayStart(p.offsetBeats * 60.0 / SCENE_BPM)
-                }
-            }
+        LaunchedEffect(Unit) { loadPreset(BUILT_IN_PRESETS.first()) }
+
+        // Presets dialog: saved presets are read when it opens; file work runs off the UI thread.
+        var showPresets by remember { mutableStateOf(false) }
+        var savedPresets by remember { mutableStateOf(emptyList<SavedPreset>()) }
+        suspend fun refreshSaved() {
+            savedPresets = withContext(Dispatchers.Default) { runCatching { PresetStore.saved() }.getOrDefault(emptyList()) }
         }
+        LaunchedEffect(showPresets) { if (showPresets) refreshSaved() }
 
         // Recording of the mixed output to a WAV file.
         var recordingOutput by remember { mutableStateOf(false) }
@@ -369,6 +391,10 @@ fun App() {
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 ) { Text("+ ${sound.label.lowercase().replaceFirstChar { it.uppercase() }}", fontSize = 13.sp) }
                             }
+                            OutlinedButton(
+                                onClick = { showPresets = true },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            ) { Text("Presets", fontSize = 13.sp) }
                             TextButton(onClick = { showAbout = true }) { Text("About", fontSize = 13.sp) }
                         }
                     }
@@ -384,6 +410,35 @@ fun App() {
             }
 
             if (showAbout) AboutDialog(onDismiss = { showAbout = false })
+
+            if (showPresets) {
+                PresetsDialog(
+                    builtIn = BUILT_IN_PRESETS,
+                    saved = savedPresets,
+                    onLoad = { preset ->
+                        loadPreset(preset)
+                        showPresets = false
+                        message = "Loaded “${preset.name}”"
+                    },
+                    onSave = { name ->
+                        val preset = currentPreset(name)
+                        scope.launch {
+                            message = runCatching {
+                                withContext(Dispatchers.Default) { PresetStore.save(preset) }
+                                "Saved preset “${preset.sanitized().name}”"
+                            }.getOrElse { "Saving preset failed: ${it.message}" }
+                            refreshSaved()
+                        }
+                    },
+                    onDelete = { saved ->
+                        scope.launch {
+                            withContext(Dispatchers.Default) { runCatching { PresetStore.delete(saved.fileName) } }
+                            refreshSaved()
+                        }
+                    },
+                    onDismiss = { showPresets = false },
+                )
+            }
 
             Text(
                 "Drag: move  •  Second finger / wheel: rotate  •  Tap: mute",

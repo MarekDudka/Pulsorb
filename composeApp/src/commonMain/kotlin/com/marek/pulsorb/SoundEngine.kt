@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 import kotlin.math.PI
 import kotlin.math.exp
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.tanh
 import kotlin.random.Random
@@ -152,8 +153,11 @@ class Voice(val sound: DrumSound, private val sampleRate: Int) {
 
     /** Delays this voice's first hit, e.g. to put a snare on the backbeat. Call before playback starts. */
     fun delayStart(seconds: Double) {
-        samplesUntilHit = (seconds * sampleRate).toInt()
+        samplesUntilHit = (seconds * sampleRate).roundToInt()
     }
+
+    /** Time until the next hit; saved in presets to keep circles in time with each other. */
+    val secondsUntilNextHit: Double get() = samplesUntilHit.coerceAtLeast(0).toDouble() / sampleRate
 
     /** True once a removed voice has faded to silence. */
     val finished: Boolean get() = removed && smoothVolume < 1e-4
@@ -191,8 +195,12 @@ class SoundEngine(val sampleRate: Int = 44_100) {
     /** Voices currently in the mix, including ones still fading out after removal. */
     val voiceCount: Int get() = voices.size
 
-    fun addVoice(sound: DrumSound): Voice {
-        val voice = Voice(sound, sampleRate)
+    /**
+     * Adds a voice. [configure] runs before the audio thread can see the voice, so tempo and
+     * start delay are in place for its very first hit (important when loading a preset mid-play).
+     */
+    fun addVoice(sound: DrumSound, configure: Voice.() -> Unit = {}): Voice {
+        val voice = Voice(sound, sampleRate).apply(configure)
         voices = voices.filterNot { it.finished } + voice
         return voice
     }

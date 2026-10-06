@@ -34,6 +34,12 @@ microphone) as a WAV file on your device:
 These files are only created when you choose to record. They stay on your device and are under your
 control. You can delete them at any time. The app never uploads them.
 
+## Presets
+
+Presets you save contain only sound settings (instrument, tempo, volume, pitch, effects and timing).
+They are stored on your device in the app's own storage and are never sent anywhere. Microphone
+samples are not included in presets.
+
 ## Children
 
 The app does not collect personal data from anyone, including children.
@@ -66,4 +72,7 @@ Działa całkowicie offline: nie ma kont, reklam, analityki ani śledzenia i nie
   aplikację, a nie dźwięk z mikrofonu. Trafiają do folderu `Music/Pulsorb` (Android 10+),
   folderu muzyki aplikacji (Android 7–9) lub `~/Music/Pulsorb` (komputer). Pozostają na
   urządzeniu i możesz je w każdej chwili usunąć.
+- **Presety** zawierają tylko ustawienia dźwięku (instrument, tempo, głośność, wysokość, efekty).
+  Są zapisywane na urządzeniu, w pamięci aplikacji, i nigdzie nie są wysyłane. Nie zawierają próbek
+  z mikrofonu.
 - **Kontakt:** Marek Dudka, marekdudka@gmail.com

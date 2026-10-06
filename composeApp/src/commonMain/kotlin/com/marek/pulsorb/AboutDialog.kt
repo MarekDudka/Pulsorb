@@ -55,7 +55,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
                 Section("Open-source components")
                 Text(
-                    "Kotlin, Compose Multiplatform, kotlinx.coroutines and AndroidX (Apache License 2.0). " +
+                    "Kotlin, Compose Multiplatform, kotlinx.coroutines, kotlinx.serialization and AndroidX " +
+                        "(Apache License 2.0). " +
                         "The reverb follows the public-domain Freeverb design.",
                 )
             }

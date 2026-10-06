@@ -30,6 +30,7 @@ Get the latest version from the [Releases](https://github.com/MarekDudka/Pulsorb
 - **A melody ready to play**: press Play and a 120 BPM groove starts with four bells on A-minor pentatonic
   notes. The bells loop at different speeds, so the melody keeps changing and only repeats every 30 beats
 - **Microphone samples**: record a short sound and play it as a drum hit
+- **Presets**: six built-in grooves, and save or load your own (see below)
 - **Echo** (tempo-synced) and **reverb** for every circle
 - **Multi-touch**: drag several circles at once, twist with two fingers to rotate
 - **Record the output** to a WAV file
@@ -52,6 +53,7 @@ The screen is a 2D coordinate plane with its origin **(0, 0) in the bottom-left 
 | **● / ■** in the list (sample circles) | Record / stop the microphone sample |
 | **✕** in the list | Remove the circle |
 | Tap the **▾ Pulsorb** header | Show / hide the circle list |
+| **Presets** | Load a built-in preset, or save, load and delete your own |
 | **About** | App version, author, license, privacy and credits |
 
 **Play/Stop** and the **☰** menu button are always visible in the top-right corner. The menu holds
@@ -72,6 +74,36 @@ Both panels start folded: tap **▸ Pulsorb** to show the circle list and **☰*
 |---|---|
 | ![Circle list and menu open](docs/screenshots/menus-open.png) | ![Mixing and recording](docs/screenshots/mixing-recording.png) |
 | The start-up melody with the circle list and menu open | Six circles with echo and reverb, recording in progress |
+
+## Presets
+
+Open **☰ → Presets** to load one of the built-in presets or save the current circles under a name.
+A preset stores each circle's instrument, tempo, volume, pitch, echo, reverb and mute state, plus its
+timing relative to the other circles, so a saved groove comes back exactly in time. Microphone
+samples are never written to storage, so Sample circles load empty; press ● to record them again.
+
+| Built-in preset | What it is |
+|---|---|
+| Music Box | 120 BPM groove with four bells on A-minor pentatonic; the melody repeats every 30 beats (loads on start) |
+| Rock Beat | Kick on 1 and 3, snare on 2 and 4, eighth-note hi-hat and a two-note bass line |
+| House | Four-on-the-floor kick, off-beat hats, a clap on 2 and 4 and C-minor stabs |
+| Polyrhythm 3:4 | Two bells in a 3-against-4 cross-rhythm over a steady pulse |
+| Ambient Drift | Slow D-major pentatonic bells at unrelated tempos with long reverb |
+| Tom Circle | Kicks tuned as toms in an interlocking pattern with a shaker-like hi-hat |
+
+All built-in presets are original. They use common genre rhythms and scales, which anyone may use,
+and contain no existing songs or melodies.
+
+Saved presets are small JSON files:
+
+- **Android:** the app's private storage (removed when the app is uninstalled)
+- **Linux:** `~/.local/share/Pulsorb/presets/` (or `$XDG_DATA_HOME/Pulsorb/presets/`)
+- **Windows:** `%APPDATA%\Pulsorb\presets\`; **macOS:** `~/Library/Application Support/Pulsorb/presets/`
+
+You can share preset files by copying them into that folder. Files are treated as untrusted: values
+are clamped to valid ranges, unknown instruments are skipped, and files over 64 KB are ignored.
+
+![Presets dialog](docs/screenshots/presets.png)
 
 ## Recordings
 
@@ -109,12 +141,14 @@ Shared tests in `composeApp/src/commonTest` run on both desktop and Android:
 - **SamplePrepTest**: microphone sample trimming, normalization, fade-out, silence rejection
 - **WavTest**: WAV header and sample encoding
 - **SoundEngineTest** and **ParticleSystemTest**: voice management, soft clipping, particle limits
-- **DefaultSceneTest**: the start-up melody's tempo, pitch, volume, pentatonic notes and timing
+- **PresetsTest**: built-in presets are valid and don't overlap on screen, JSON round trip, clamping
+  of untrusted files, safe file names, and saved timing restoring the exact same groove
 
 Desktop-only tests in `composeApp/src/desktopTest` play about 2 seconds of sound on the real audio
 device, decode a recording with Java's own WAV reader, and check that saved files never overwrite
-each other. `SceneRenderTest` renders 30 seconds of the start-up melody offline, checks it isn't
-clipped, and leaves it at `composeApp/build/demo/default-scene.wav` so you can listen to it.
+each other. `PresetFilesTest` checks saving, replacing, deleting and path-traversal protection in a
+temporary folder. `SceneRenderTest` renders 30 seconds of every built-in preset offline, checks none
+is clipped or too quiet, and leaves them in `composeApp/build/demo/` so you can listen to them.
 
 You can also open the project in Android Studio or IntelliJ IDEA.
 
@@ -145,6 +179,8 @@ composeApp/src/
 │   ├── SampleRecorder.kt   microphone sample capture and trimming
 │   ├── Particles.kt        beat particle effects
 │   ├── Wav.kt              WAV encoding
+│   ├── Presets.kt          preset model, built-in presets, validation, storage
+│   ├── PresetsDialog.kt    Presets dialog
 │   ├── AboutDialog.kt      About dialog
 │   ├── AppInfo.kt          app name, version, author, links
 │   ├── AudioOutput.kt      expect: speaker output
