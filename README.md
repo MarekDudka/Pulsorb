@@ -9,6 +9,21 @@ Runs on **Android** and **Desktop** (Linux, macOS, Windows).
 
 ![Pulsorb – playing](docs/screenshots/playing.png)
 
+## Download
+
+Get the latest version from the [Releases](https://github.com/MarekDudka/Pulsorb/releases) page:
+
+- **Android** (7.0 or newer): download `Pulsorb-<version>.apk` and open it on your phone. Android will ask
+  you to allow installing apps from your browser or file manager.
+- **Linux** (x86-64): download `Pulsorb-<version>-x86_64.AppImage`, make it executable and run it:
+  ```bash
+  chmod +x Pulsorb-*-x86_64.AppImage
+  ./Pulsorb-*-x86_64.AppImage
+  ```
+  It includes its own Java runtime, so nothing else needs to be installed.
+
+`SHA256SUMS` lets you check the downloads with `sha256sum -c SHA256SUMS`.
+
 ## Features
 
 - **Kick, snare, hi-hat, bell and sample circles**: each one has its own beat clock, tempo, volume and pitch
@@ -102,6 +117,21 @@ each other. `SceneRenderTest` renders 30 seconds of the start-up melody offline,
 clipped, and leaves it at `composeApp/build/demo/default-scene.wav` so you can listen to it.
 
 You can also open the project in Android Studio or IntelliJ IDEA.
+
+### Release builds
+
+```bash
+# Signed, shrunk Android APK -> composeApp/build/outputs/apk/release/
+./gradlew :composeApp:assembleRelease
+
+# Linux AppImage -> dist/Pulsorb-<version>-x86_64.AppImage (needs mksquashfs)
+./scripts/build-appimage.sh
+```
+
+The release APK is signed with the key named in `keystore.properties` in the project root, which is
+git-ignored and holds `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without that file
+the release APK is built unsigned. Keep the keystore safe: every update must be signed with the same
+key, or Android refuses to install it over the previous version.
 
 On Android the app asks for microphone permission the first time you record a sample.
 

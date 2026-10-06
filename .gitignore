@@ -9,3 +9,9 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+# Release signing – never commit
+keystore.properties
+*.jks
+*.keystore
+dist/
+hs_err_pid*.log
